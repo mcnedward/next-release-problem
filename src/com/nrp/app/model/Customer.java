@@ -37,11 +37,11 @@ public class Customer {
 	 * @return The profit from fulfilling this customer's requirements, scaled to match the weight of their
 	 *         requirements.
 	 */
-	public double calculateProfit(List<Integer> requirements) {
+	public double calculateProfit(List<Requirement> requirements) {
 		List<Requirement> requirementsToBeFilled = new ArrayList<Requirement>();
-		for (Integer rid : requirements) {
-			Requirement r = getRequirementById(rid);
-			if (r != null)
+		for (Requirement r : requirements) {
+			Requirement requirement = getRequirementById(r.getId());
+			if (requirement != null)
 				requirementsToBeFilled.add(r);
 		}
 		double weight = 0;

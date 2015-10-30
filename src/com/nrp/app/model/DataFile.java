@@ -1,9 +1,7 @@
 package com.nrp.app.model;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import com.google.inject.Inject;
 
@@ -19,7 +17,7 @@ public class DataFile {
 	private String fileName;
 	private List<String> lines;
 	private List<Customer> customers;
-	private Map<Integer, Integer> requirements;
+	private List<Requirement> requirements;
 	private double budget;
 
 	/**
@@ -31,7 +29,7 @@ public class DataFile {
 		this.fileName = fileName;
 		this.lines = lines;
 		customers = new ArrayList<Customer>();
-		requirements = new HashMap<Integer, Integer>();
+		requirements = new ArrayList<Requirement>();
 	}
 
 	/**
@@ -114,7 +112,7 @@ public class DataFile {
 			int value = Integer.valueOf(s);
 			// Add this requirement's value to the budget and assign it to the map with the next index.
 			budget += value;
-			requirements.put(index++, value);
+			requirements.add(new Requirement(index++, value));
 		}
 		// Move the current line up by 2
 		currentLine += 2;
@@ -132,16 +130,19 @@ public class DataFile {
 		String[] split = lines.get(currentLine).split(" ");
 		int profit = Integer.valueOf(split[0]);
 		int numberOfRequests = Integer.valueOf(split[1]);
-		List<Requirement> requirements = new ArrayList<Requirement>();
 
+		List<Requirement> customerRequirements = new ArrayList<Requirement>();
+		
 		int index = 2; // Start at index 2
 		for (int x = 0; x < numberOfRequests; x++) {
 			Integer id = Integer.valueOf(split[index++]);
-			int cost = this.requirements.get(id);
-			Requirement requirement = new Requirement(id, cost);
-			requirements.add(requirement);
+			for (Requirement r : requirements) {
+				if (r.getId() == id) {
+					customerRequirements.add(r);
+				}
+			}
 		}
-		return new Customer(customerId, profit, requirements);
+		return new Customer(customerId, profit, customerRequirements);
 	}
 
 	/**
@@ -184,7 +185,7 @@ public class DataFile {
 	/**
 	 * @return the requirements
 	 */
-	public Map<Integer, Integer> getRequirements() {
+	public List<Requirement> getRequirements() {
 		return requirements;
 	}
 
