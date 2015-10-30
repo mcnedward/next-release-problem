@@ -16,7 +16,7 @@ public class Customer {
 	public Customer() {
 		requirements = new ArrayList<Requirement>();
 	}
-	
+
 	/**
 	 * @param profit
 	 * @param requirements
@@ -26,7 +26,35 @@ public class Customer {
 		this.profit = profit;
 		this.requirements = requirements;
 	}
-	
+
+	/**
+	 * Find the amount of profit that would be earned from fulfilling the specified list of requirements. The weight of
+	 * each requirement in the list that is required by the customer will be taken into account, then the profit for
+	 * that customer will be scaled to determine the amount of profit for this customer.
+	 * 
+	 * @param requirements
+	 *            The list of requirements that have been selected.
+	 * @return The profit from fulfilling this customer's requirements, scaled to match the weight of their
+	 *         requirements.
+	 */
+	public double calculateProfit(List<Integer> requirements) {
+		List<Requirement> requirementsToBeFilled = new ArrayList<Requirement>();
+		for (Integer rid : requirements) {
+			Requirement r = getRequirementById(rid);
+			if (r != null)
+				requirementsToBeFilled.add(r);
+		}
+		double weight = 0;
+		for (Requirement requirement : requirementsToBeFilled) {
+			weight += requirement.getWeight();
+		}
+		if (weight == 0)
+			return 0;
+		double scale = (100 / weight);
+		double profitForRequirements = profit * scale;
+		return profitForRequirements;
+	}
+
 	public Requirement getRequirementById(int id) {
 		for (Requirement r : requirements) {
 			if (r.getId() == id)
@@ -43,7 +71,8 @@ public class Customer {
 	}
 
 	/**
-	 * @param id the id to set
+	 * @param id
+	 *            the id to set
 	 */
 	public void setId(int id) {
 		this.id = id;
@@ -78,7 +107,7 @@ public class Customer {
 	public void setRequirements(List<Requirement> requirements) {
 		this.requirements = requirements;
 	}
-	
+
 	@Override
 	public String toString() {
 		return "Customer[" + id + "] - Profit: " + profit + "; Number of Requirements: " + requirements.size();

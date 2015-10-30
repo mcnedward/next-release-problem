@@ -14,6 +14,7 @@ import org.opt4j.core.start.Constant;
 
 import com.google.inject.Inject;
 import com.nrp.app.DataCreator;
+import com.nrp.app.Main;
 import com.nrp.app.model.Customer;
 import com.nrp.app.model.DataFile;
 import com.nrp.app.model.Requirement;
@@ -26,6 +27,8 @@ public class NRPEvaluator implements Evaluator<String> {
 
 	private Random random;
 	private DataFile dataFile;
+
+	private Map<String, Double> fitnessMap;
 
 	@Inject
 	public NRPEvaluator(@Constant(value = "fileName") String fileName) {
@@ -41,12 +44,14 @@ public class NRPEvaluator implements Evaluator<String> {
 	public Objectives evaluate(String phenotype) {
 		random = new Random();
 		Objectives objectives = new Objectives();
+		fitnessMap = new HashMap<String, Double>();
 
-		Map<String, Double> fitnessMap = evaluateFitnesses(phenotype);
+		evaluateFitnesses(phenotype);
 
-		objectives.add("Cost Fitness", Sign.MIN, fitnessMap.get("costFitness"));
-		objectives.add("Value Fitness", Sign.MAX, fitnessMap.get("valueFitness"));
-		objectives.add("Fault Coverage", Sign.MIN, fitnessMap.get("faultCoverageFitness"));
+		objectives.add("Cost To Fulfill All", Sign.MIN, fitnessMap.get("costFitness"));
+		objectives.add("Over/Under Budget", Sign.MIN, fitnessMap.get("costVariance"));
+		objectives.add("Profit", Sign.MAX, fitnessMap.get("totalProfit"));
+		objectives.add("Fulfilled Requirements", Sign.MAX, fitnessMap.get("requirementCoverageFitness"));
 		return objectives;
 	}
 
@@ -58,8 +63,6 @@ public class NRPEvaluator implements Evaluator<String> {
 	 * @return A map of all of the fitness values with the name being the key.
 	 */
 	private Map<String, Double> evaluateFitnesses(String phenotype) {
-		Map<String, Double> fitnessMap = new HashMap<String, Double>();
-
 		// If there are more booleans in the phenotype than there are requirements, remove the extra booleans
 		int maxRequirementSize = dataFile.getRequirements().size();
 		if (phenotype.length() > maxRequirementSize) {
@@ -76,42 +79,95 @@ public class NRPEvaluator implements Evaluator<String> {
 			}
 		}
 
-		double costFitness = evaluateCostFitness(phenotype, requirementIds);
+		double costFitness = evaluateCostFitness(requirementIds);
 		fitnessMap.put("costFitness", costFitness);
 
-		double valueFitness = evaluateValueFitness(requirementIds);
-		fitnessMap.put("valueFitness", valueFitness);
+		double costVariance = evaluateCostVarianceFitness();
+		fitnessMap.put("costVariance", costVariance);
 
-		double faultCoverageFitness = evaluateFaultCoverage(requirementIds);
-		fitnessMap.put("faultCoverageFitness", faultCoverageFitness);
+		double totalProfit = evaluateProfitFitness(requirementIds);
+		fitnessMap.put("totalProfit", totalProfit);
+
+		double requirementCoverageFitness = evaluateRequirementCoverageFitness(requirementIds);
+		fitnessMap.put("requirementCoverageFitness", requirementCoverageFitness);
 
 		return fitnessMap;
 	}
 
 	/**
-	 * Evaluate the cost fitness.
+	 * Evaluate the cost fitness. This will determine the total amount to fulfill all customer requirements.
 	 * 
-	 * @param phenotype
 	 * @param requirementIds
-	 * @return
+	 *            The list of requirements that have been selected
+	 * @return The cost fitness
 	 */
-	private int evaluateCostFitness(String phenotype, List<Integer> requirementIds) {
+	private double evaluateCostFitness(List<Integer> requirementIds) {
 		int fitness = 0;
 
 		for (Customer customer : dataFile.getCustomers()) {
-			int customerCost = findCostsForCustomer(customer, requirementIds);
+			double customerCost = findCostsForCustomer(customer, requirementIds);
 			fitness += customerCost;
 		}
 
-		if (fitness == 0)
-			System.out.println("Cost for all customers was 0!");
-		
-		int budget = dataFile.getBudget();
-		if (fitness > budget)
-			System.out.println("Went over budget...\nBudget - " + budget + "; Total cost - " + fitness);
-
 		return fitness;
 	}
+
+	/**
+	 * Evaluate the cost variance. This will determine how much over or under budget the data set went.
+	 * 
+	 * @return The cost variance fitness
+	 */
+	private double evaluateCostVarianceFitness() {
+		double cost = fitnessMap.get("costFitness");
+		double budget = dataFile.getBudget();
+		double costVariance = budget - cost;
+		Main.print("Cost Variance: " + costVariance + "; Budget: " + budget + "; Cost: " + cost);
+		return costVariance;
+	}
+
+	/**
+	 * Evaluate profit. This will find the weighted profit from each customer, and add that to the total
+	 * profit. That profit is then reduced from the budget, and the remaining amount will determine the amount of profit
+	 * that was made from this data set.
+	 * 
+	 * @param requirements
+	 *            The list of requirements that have been selected
+	 * @return The profit fitness
+	 */
+	private double evaluateProfitFitness(List<Integer> requirements) {
+		double totalProfit = 0;
+		for (Customer customer : dataFile.getCustomers()) {
+			totalProfit += customer.calculateProfit(requirements);
+		}
+		double profit = totalProfit - dataFile.getBudget();
+		Main.print("Total Profit: " + profit, false);
+		return profit;
+	}
+
+	/**
+	 * Evaluate the requirement coverage. This will find the count of fulfilled customer requirements, then divide that
+	 * by the total amount of requirements. The result is the percentage of fulfilled requirements.
+	 * 
+	 * @param requirementIds
+	 *            The list of requirements that have been selected
+	 * @return The requirement coverage fitness
+	 */
+	private double evaluateRequirementCoverageFitness(List<Integer> requirementIds) {
+		int count = 0;
+		int numberOfRequirements = 0;
+		for (Customer customer : dataFile.getCustomers()) {
+			numberOfRequirements += customer.getRequirements().size();
+			for (Integer id : requirementIds) {
+				Requirement requirement = customer.getRequirementById(id);
+				if (requirement != null)
+					count++;
+			}
+		}
+		double requirementCoverage = ((double) count / numberOfRequirements) * 100;
+		Main.print("Requirement Coverage: " + requirementCoverage, false);
+		return requirementCoverage;
+	}
+
 
 	/**
 	 * Calculate the cost for all of the matching requirements for a customer.
@@ -122,7 +178,7 @@ public class NRPEvaluator implements Evaluator<String> {
 	 *            The list of requirement ids to use.
 	 * @return The cost of all the requirements that this customer has.
 	 */
-	private int findCostsForCustomer(Customer customer, List<Integer> requirementIds) {
+	private double findCostsForCustomer(Customer customer, List<Integer> requirementIds) {
 		int cost = 0;
 		for (Integer id : requirementIds) {
 			Requirement requirement = customer.getRequirementById(id);
@@ -149,9 +205,6 @@ public class NRPEvaluator implements Evaluator<String> {
 		// If the size is greater than the population, use the population's max size instead, in order to keep unique
 		// requirements
 		if (size >= keys.length) {
-			// System.out.println("Original population of " + size + " is greater than or equal to requirements total.
-			// Using the max amount of requirements: "
-			// + dataFileMap.size());
 			return Arrays.asList(keys);
 		}
 		for (int x = 0; x < size; x++) {
@@ -165,56 +218,6 @@ public class NRPEvaluator implements Evaluator<String> {
 			requirementIds.add(requirementId);
 		}
 		return requirementIds;
-	}
-
-	/**
-	 * Evaluate the fitness of the value of all the requirements of a customer, based on the weight that those
-	 * requirements are for the customer.
-	 * 
-	 * @param requirementIds
-	 *            The list of requirement ids that are used.
-	 * @return The value fitness.
-	 */
-	private double evaluateValueFitness(List<Integer> requirementIds) {
-		double fitness = 0;
-
-		double weight = 0;
-		int count = 0;
-		for (Customer customer : dataFile.getCustomers()) {
-			boolean counted = false;
-			for (Integer id : requirementIds) {
-				Requirement requirement = customer.getRequirementById(id);
-				if (requirement != null) {
-					weight += requirement.getWeight();
-					if (!counted) {
-						count++;
-						counted = true;
-					}
-				}
-			}
-		}
-
-		if (weight == 0 && count == 0) {
-			System.out.println("Value was 0!");
-			return 0;
-		} else {
-			fitness = weight / count;
-			return fitness;
-		}
-	}
-
-	/**
-	 * Evaluate the fitness for the coverage of faults.
-	 * 
-	 * @param requirementIds
-	 *            The requirement ids that are used.
-	 * @return The fitness for fault coverage.
-	 */
-	private double evaluateFaultCoverage(List<Integer> requirementIds) {
-		double fitness = requirementIds.size();
-		if (fitness == 0)
-			System.out.println("Fault coverage was 0!");
-		return fitness;
 	}
 
 }

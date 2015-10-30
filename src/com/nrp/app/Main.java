@@ -29,7 +29,7 @@ public class Main {
 		NRPDecoder decoder = new NRPDecoder();
 		NRPEvaluator evaluator = new NRPEvaluator(FILE_NAME);
 
-		for (int x = 0; x < 10000; x++) {
+		for (int x = 0; x < 100; x++) {
 			BooleanGenotype genotype = creator.create();
 			String phenotype = decoder.decode(genotype);
 			evaluator.evaluate(phenotype);
@@ -48,6 +48,15 @@ public class Main {
 		file.calculateRequirementValue(customer);
 
 		file.normalize();
+	}
+	
+	public static void print(String text) {
+		print(text, true);
+	}
+	
+	public static void print(String text, boolean print) {
+		if (print)
+			System.out.println(text);
 	}
 
 }

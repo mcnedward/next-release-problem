@@ -20,7 +20,7 @@ public class DataFile {
 	private List<String> lines;
 	private List<Customer> customers;
 	private Map<Integer, Integer> requirements;
-	private int budget;
+	private double budget;
 
 	/**
 	 * @param fileName
@@ -191,7 +191,7 @@ public class DataFile {
 	/**
 	 * @return the budget
 	 */
-	public int getBudget() {
+	public double getBudget() {
 		return budget;
 	}
 
